@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+eframe = { version = "0.34.3", default-features = false, features = ["default_fonts", "glow", "persistence", "wayland", "x11"] }
+meval = "0.2.0"
