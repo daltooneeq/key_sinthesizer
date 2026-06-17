@@ -1,8 +1,16 @@
+mod key;
+
 use eframe::{egui};
 
-
-
+use std::thread;
 fn main() {
+    thread::spawn(|| {
+        key::input_listen();
+    });
+    
+    println!("{:?}", key::get_notes(440.0));
+
+
     let native_options = eframe::NativeOptions::default();
     eframe::run_native("sinth", native_options, Box::new(|cc| Ok(Box::new(App::new(cc)))));
 }
