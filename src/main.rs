@@ -1,33 +1,58 @@
 mod key;
+mod f;
+mod sound;
 
 use eframe::{egui};
 
+use cpal::{Stream, traits::{DeviceTrait, HostTrait, StreamTrait}};
+
 use std::thread;
+
+
 fn main() {
     thread::spawn(|| {
         key::input_listen();
     });
-    
-    println!("{:?}", key::get_notes(440.0));
+
+
+    let host = cpal::default_host();
+    let device = host.default_output_device().expect("No output device available");
+    let config = device.default_output_config().unwrap();
+    println!("cfg: {:?}", config);
+    let sample_rate = config.sample_rate() as f32;
+    let channels = config.channels() as usize;
 
 
     let native_options = eframe::NativeOptions::default();
-    eframe::run_native("sinth", native_options, Box::new(|cc| Ok(Box::new(App::new(cc)))));
+    eframe::run_native("sinth", native_options, Box::new(|cc| Ok(Box::new(App::new(cc, device, config)))));
 }
 
-#[derive(Default)]
 struct App{
     text: String,
 
-    x: Vec<f64>,
-    y: Vec<f64>,
+    x: Vec<f32>,
+    y: Vec<f32>,
     func_succ: bool,
     clicked: bool,
 
+    device: cpal::Device,
+    config: cpal::SupportedStreamConfig,
+
+    stream: Option<cpal::Stream>,
+
 }
 impl App{
-    fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        Self::default()
+    fn new(cc: &eframe::CreationContext<'_>, device: cpal::Device, config: cpal::SupportedStreamConfig) -> Self {
+        Self {
+            text: "".to_string(),
+            x: vec![],
+            y: vec![],
+            func_succ: false,
+            clicked: false,
+            device: device,
+            config: config,
+            stream: None,
+        }
     }
 }
 impl eframe::App for App {
@@ -39,16 +64,21 @@ impl eframe::App for App {
 
             
             if ui.button("New Function").clicked() {
-                (self.x, self.y) = get_function(&self.text);
-                self.func_succ = check_periodicity(&self.x, &self.y);
+                (self.x, self.y) = f::get_function(&self.text);
+                self.func_succ = f::check_periodicity(&self.x, &self.y);
                 self.clicked = true;
+            }
+            if ui.button("Test").clicked() {
+                let stream = sound::make(&self.device, &self.config, 220.0, 48000.0, &self.y);
+                stream.play().unwrap();
+                self.stream = Some(stream);
             }
             if !self.func_succ {
                 ui.label("Function is not periodicity");
             }
             if self.clicked{
 
-                ui.label(egui::RichText::new(draw_function(&self.x, &self.y))
+                ui.label(egui::RichText::new(f::draw_function(&self.x, &self.y))
                     .monospace()
                     .size(2.0)
                 );
@@ -57,51 +87,3 @@ impl eframe::App for App {
     }
 }
 
-fn get_function (s: &str) -> (Vec<f64>, Vec<f64>) {
-    let mut y: Vec<f64> = vec![0.0; 400];
-    let mut x: Vec<f64> = vec![0.0; 400];
-
-    for i in 0..400 {
-        x[i] = (i as f64)/100.0;
-
-        let copy = s.replace("x", &format!("{}", x[i] * std::f64::consts::PI));
-
-
-        y[i] = meval::eval_str(&copy).unwrap();
-
-        if y[i] < -1.0 {y[i] = -1.0};
-        if y[i] > 1.0 {y[i] = 1.0};
-
-    }
-    (x, y)
-
-}
-fn check_periodicity(x: &Vec<f64>, y: &Vec<f64>) -> bool{
-    let normal_error = 1e-3; 
-    for i in 0..200 {
-        if (y[i] - y[i+200]).abs() > normal_error {return false}
-    }
-    true
-}
-fn draw_function(x: &Vec<f64>, y: &Vec<f64>) -> String{
-
-
-    let mut res = vec![vec![' '; 400]; 21];
-
-    for i in (0..400).step_by(1) {
-        res[(((y[i]+1.0)*10.0).round()) as usize][i/1] = '∎';
-    }
-
-
-    let mut result_str = String::new();
-    for i in (0..=20).rev() {
-        for el in &res[i]{
-            result_str = result_str + &el.to_string();
-        }
-        result_str += "\n";
-    }
-
-    result_str
-
-
-}

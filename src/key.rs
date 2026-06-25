@@ -7,9 +7,9 @@ pub fn input_listen() {
         println!("Error: {:?}", error)
     }
     fn callback(event: Event) {
-        println!("callback {:?}", event.event_type);
+        //println!("callback {:?}", event.event_type);
         if let Some(string) = event.name {
-            println!("{:?}", string)
+            //...
         }
     }
 }
